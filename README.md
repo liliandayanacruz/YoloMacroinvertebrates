@@ -93,6 +93,7 @@ https://pjreddie.com/media/files/papers/YOLOv3.pdf
 
 ### Based on work by Erik Linder and David Revelo Luna (Youtube)
    https://github.com/eriklindernoren
+   
    https://www.youtube.com/watch?v=JGS-FopcNyA
 
 ### Original dataset
