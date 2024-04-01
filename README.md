@@ -1,106 +1,100 @@
-# YoloV3 custom training video
-En este proyecto se presenta el entrenamiento con tu propio dataset para YOLOv3
+# YoloV3 custom dataset
+In this project we present a model to train Yolo V3 for a custom dataset (Macroinvertebrates). In this version we address only a sample of Class Elmis_anea_adul. Also, we used the features detected in the morphotaxonomic concordance evaluation as classes to detect. 
 
-## Artículo original:
+## Original paper:
 https://pjreddie.com/media/files/papers/YOLOv3.pdf
 
-# Implementación:
+# Implementation:
 
-### Crear entorno en conda
-
-  	$ conda create -n YoloCustom anaconda python=3.6
-	
-	$ conda activate YoloCustom
-  
-  	$ pip install opencv-python numpy matplotlib tensorboard terminaltables pillow tqdm
-  
-  	$ conda install pytorch==1.1.0 torchvision==0.3.0 cudatoolkit=10.0 -c pytorch
-
-### Preparar Dataset
-  Ejecutar labelImg.py
+### Prepare Dataset
+  Execute labelImg.py
   
   	$ cd labelImg
   
   	$ python labelImg.py
   
-  Se deben obtener los archivos labels (.txt) de las imagenes de tu dataset
+  It's neccesary to obtain the label files (.txt) from dataset images.
   
-  Luego ejecutar jupyter notebook desde anaconda y abrir Yolov3Files.ipyb para generar los archivos train.txt y valid.txt
+  Then, execute jupyter notebook from anaconda y open Yolov3Files.ipyb to generate the train.txt and valid.txt files.
   
   $ jupyter notebook
   
-  Finalmente se obtienen los siguientes archivos
+  Finally you need to obtain the following files: 
   
-  	En data/custom/images las imagenes del dataset
+  	In data/custom/images the dataset images
   
-  	En data/custom/labels los labels .txt del dataset
+  	In data/custom/labels the dataset labels (.txt) 
   
-  	En data/ los archivos train.txt y valid.txt
+  	In data/ the train.txt and valid.txt files
   
-  	En data/ el archivo classes.names con los nombres de las clases del dataset
+  	In data/ the classes.names file with the class names of dataset
   
-  	En la carpeta config/ el archivo .cfg que corresponda con el número de clases de nuestro dataset
+  	In the folder config/ the file .cfg that corresponds to the class number of our dataset (FinBenthic)
   
-  	En la carpeta config/ modificar el archivo custom.data con el número de clases del dataset
+  	In the folder config/ to modify the custom.data file with the class number of dataset (FinBenthic)
   
-  Para el archivo .cfg abrir el archivo bash .sh y modificar el parámetro NUM_CLASSES=3
+  To the file .cfg we need to open the bash (.sh) file and modify NUM_CLASSES=5 parameter. This file needs to execute using Git for Windows
+  (Installer available at: https://git-scm.com/download/win)
+
+  **Classes:**
+
+  	l19: Legs of class 19 (Elmis_aena_adult)
+  	h19: Head of class 19 (Elmis_aena_adult)
+  	c19: Coxa of class 19 (Elmis_aena_adult)
+  	e19: Elytra of class 19 (Elmis_aena_adult)
+  	a19: Antenna of class 19 (Elmis_aena_adult)
   
-  Ejecutarlo usango Git para windows
   
-  Si no tienes instalado Git para windows lo puedes descargar en el siguieinte enlace
-  
-  https://git-scm.com/download/win
-  
-  
-### Entrenamiento en google colab
+### Train using Google Colab
   	$!pip install torch==1.1 torchvision==0.3
   
   	$!pip install opencv-python numpy matplotlib tensorboard terminaltables pillow tqdm
   
-  	$!git clone https://github.com/DavidReveloLuna/Yolov3Custom.git
+  	$!git clone https://github.com/liliandayanacruz/YoloMacroinvertebrates.git
   
   	$cd Yolov3Custom
   
   	$import urllib.request
 
-  	$urllib.request.urlretrieve('https://pjreddie.com/media/files/darknet53.conv.74','/content/Yolov3Custom/weights/darknet53.conv.74')
+  	$urllib.request.urlretrieve('https://pjreddie.com/media/files/darknet53.conv.74','/content/YoloMacroinvertebrates/weights/darknet53.conv.74')
 	
 	$from google.colab import drive
         
 	$drive.mount('/content/drive')
 	
-	$!cp -r "/content/drive/My Drive/Desarrollos/YoloCustom/custom" "/content/Yolov3Custom/data"
+	$!cp -r "/content/drive/My Drive/2024-1/YoloMacroinvertebrates/custom" "/content/YoloMacroinvertebrates/data"
         
-	$!cp -r "/content/drive/My Drive/Desarrollos/YoloCustom/config" "/content/Yolov3Custom"
+	$!cp -r "/content/drive/My Drive/2024-1/YoloMacroinvertebrates/config" "/content/YoloMacroinvertebrates"
 
-  Entrar al directorio /usr/local/lib/libpackages/torchvision/transforms/functional.py
+  Modify the file /usr/local/lib/libpackages/torchvision/transforms/functional.py
   
-  Cambiar esta línea
+  Change this code line:
   
 	from PIL import Image, ImageOps, ImageEnhance, PILLOW_VERSION
 	
-  Por esta
+  For this
   
     from PIL import Image, ImageOps, ImageEnhance, __version__ as PILLOW_VERSION
     
-  Entrenamiento
+  Train
 	
-  	$!python train.py --model_def config/yolov3-custom3C.cfg --data_config config/custom.data --epochs 200 --batch_size 4 --pretrained_weights weights/darknet53.conv.74
+  	$!python train.py --model_def config/yolov3-custom5C.cfg --data_config config/custom.data --epochs 200 --batch_size 4 --pretrained_weights weights/darknet53.conv.74
   
-### Prueba local en imágen y video
+### Local test in images sample
 
-   Descargar el archivo .pth y copiarlo en el directorio checkpoints local
+   Download the last file .pth and copy in the folder checkpoints local
    
-   	python detectC.py --image_folder data/samplesC/ --model_def config/yolov3-custom3C.cfg --weights_path checkpoints/yolov3_ckpt_252.pth --class_path data/custom/classes.names
+   	python detectC.py --image_folder data/samplesC/ --model_def config/yolov3-custom5C.cfg --weights_path checkpoints/yolov3_ckpt_199.pth --class_path data/custom/classes.names
    
-   	python detect_cam.py --model_def config/yolov3-custom3C.cfg --weights_path checkpoints/yolov3_ckpt_252.pth --class_path data/custom/classes.names --conf_thres 0.6
+   	It's possible to test in a video with the follow line code:
+    
+    python detect_cam.py --model_def config/yolov3-custom5C.cfg --weights_path checkpoints/yolov3_ckpt_252.pth --class_path data/custom/classes.names --conf_thres 0.6
    
 
-### Basado en el trabajo de Erik Linder
+### Based on work by Erik Linder and David Revelo Luna (Youtube)
    https://github.com/eriklindernoren
+   
+   https://www.youtube.com/watch?v=JGS-FopcNyA
 
-### Dataset original
+### Original dataset
    https://www.tooploox.com/blog/card-detection-using-yolo-on-android
-
-# **Canal de Youtube**
-[Click aquì pare ver mi canal de YOUTUBE](https://www.youtube.com/channel/UCr_dJOULDvSXMHA1PSHy2rg)
