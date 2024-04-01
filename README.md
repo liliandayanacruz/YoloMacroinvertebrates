@@ -38,11 +38,11 @@ https://pjreddie.com/media/files/papers/YOLOv3.pdf
 
   **Classes:**
 
-  $l19: Legs of class 19 (Elmis_aena_adult)
-  $h19: Head of class 19 (Elmis_aena_adult)
-  $c19: Coxa of class 19 (Elmis_aena_adult)
-  $e19: Elytra of class 19 (Elmis_aena_adult)
-  $a19: Antenna of class 19 (Elmis_aena_adult)
+  	l19: Legs of class 19 (Elmis_aena_adult)
+  	h19: Head of class 19 (Elmis_aena_adult)
+  	c19: Coxa of class 19 (Elmis_aena_adult)
+  	e19: Elytra of class 19 (Elmis_aena_adult)
+  	a19: Antenna of class 19 (Elmis_aena_adult)
   
   
 ### Train using Google Colab
