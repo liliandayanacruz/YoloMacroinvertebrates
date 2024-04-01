@@ -1,10 +1,10 @@
-# YoloV3 custom training video
-En este proyecto se presenta el entrenamiento con tu propio dataset para YOLOv3
+# YoloV3 custom
+In this project we presented a train model of Yolo V3 for a custom dataset (Macroinvertebrates)
 
-## Artículo original:
+## Original paper:
 https://pjreddie.com/media/files/papers/YOLOv3.pdf
 
-# Implementación:
+# Implementation:
 
 ### Crear entorno en conda
 
