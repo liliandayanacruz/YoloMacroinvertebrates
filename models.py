@@ -16,6 +16,7 @@ import matplotlib.patches as patches
 def create_modules(module_defs):
     """
     Constructs module list of layer blocks from module configuration in module_defs
+    The module definitions are used to build the convolutional, pooling, sampling, and detection layers.
     """
     hyperparams = module_defs.pop(0)
     output_filters = [int(hyperparams["channels"])]
@@ -97,14 +98,16 @@ class Upsample(nn.Module):
 
 
 class EmptyLayer(nn.Module):
-    """Placeholder for 'route' and 'shortcut' layers"""
+    """Placeholder for 'route' and 'shortcut' layers
+       Defines an empty layer that acts as a placeholder for the 'route' and 'shortcut' layers
+    """
 
     def __init__(self):
         super(EmptyLayer, self).__init__()
 
 
 class YOLOLayer(nn.Module):
-    """Detection layer"""
+    """Detection layer and calculates the associated losses during training"""
 
     def __init__(self, anchors, num_classes, img_dim=416):
         super(YOLOLayer, self).__init__()
