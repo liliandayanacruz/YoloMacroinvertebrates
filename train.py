@@ -25,7 +25,7 @@ import torch.optim as optim
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
-    parser.add_argument("--batch_size", type=int, default=8, help="size of each image batch")
+    parser.add_argument("--batch_size", type=int, default=5, help="size of each image batch")
     parser.add_argument("--gradient_accumulations", type=int, default=2, help="number of gradient accums before step")
     parser.add_argument("--model_def", type=str, default="config/yolov3.cfg", help="path to model definition file")
     parser.add_argument("--data_config", type=str, default="config/coco.data", help="path to data config file")
@@ -86,18 +86,38 @@ if __name__ == "__main__":
         "conf",
         "cls",
         "cls_acc",
-        "recall50",
+        "recall50", 
         "recall75",
         "precision",
         "conf_obj",
         "conf_noobj",
     ]
+    #Recall50 and Recall75: They are the recall rate (the proportion of positive examples 
+    #that were correctly identified) calculated from the confidence thresholds of 50% and 75% 
+    #respectively. For example, recall50 of 0.90 means that 90% of the positive examples were 
+    #correctly identified with a 50% confidence threshold.
 
+    #conf_obj and conf_noobj: They are object and non-object confidence measures respectively. 
+    #Conf_obj is the average confidence assigned to correctly detected objects, 
+    #while Conf_noobj is the average confidence assigned to places where no object was detected. 
+    #A high value in Conf_obj indicates that the model is confident in its object detections, 
+    #while a low value in Conf_noobj suggests that the model is not generating false positives 
+    #in areas where there are no objects.
+
+    #cls_acc: It is the classification accuracy, that is, the proportion of classes correctly 
+    #predicted in all detections. It is calculated as the percentage of correctly predicted 
+    #classes among all detections.
+
+    #Precision: It is a measure of the precision of object detections, that is, the proportion 
+    #of positive detections that are truly positive. It is calculated as the number of true 
+    #positives divided by the total number of detections (true positives plus false positives). 
+    #The precision is calculated for each class individually and then averaged.
+    
     for epoch in range(opt.epochs):
         model.train()
         start_time = time.time()
         for batch_i, (_, imgs, targets) in enumerate(dataloader):
-            batches_done = len(dataloader) * epoch + batch_i
+            batches_done = (len(dataloader) // 2) * epoch + batch_i
 
             imgs = Variable(imgs.to(device))
             targets = Variable(targets.to(device), requires_grad=False)
@@ -116,26 +136,47 @@ if __name__ == "__main__":
 
             log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, opt.epochs, batch_i, len(dataloader))
 
-            metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
+            metric_table = [["Metrics", "Total"]]
+            #metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
 
             # Log metrics at each YOLO layer
-            for i, metric in enumerate(metrics):
-                formats = {m: "%.6f" for m in metrics}
-                formats["grid_size"] = "%2d"
-                formats["cls_acc"] = "%.2f%%"
-                row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.yolo_layers]
-                metric_table += [[metric, *row_metrics]]
+            #for i, metric in enumerate(metrics):
+            #    formats = {m: "%.6f" for m in metrics}
+            #    formats["grid_size"] = "%2d"
+            #    formats["cls_acc"] = "%.2f%%"
+            #    row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.yolo_layers]
+            #    metric_table += [[metric, *row_metrics]]
 
                 # Tensorboard logging
-                tensorboard_log = []
-                for j, yolo in enumerate(model.yolo_layers):
-                    for name, metric in yolo.metrics.items():
-                        if name != "grid_size":
-                            tensorboard_log += [(f"{name}_{j+1}", metric)]
-                tensorboard_log += [("loss", loss.item())]
-                logger.list_of_scalars_summary(tensorboard_log, batches_done)
+            #    tensorboard_log = []
+            #    for j, yolo in enumerate(model.yolo_layers):
+            #        for name, metric in yolo.metrics.items():
+            #            if name != "grid_size":
+            #                tensorboard_log += [(f"{name}_{j+1}", metric)]
+            #    tensorboard_log += [("loss", loss.item())]
+            #    logger.list_of_scalars_summary(tensorboard_log, batches_done)
+            
+            #new/
+            for i, yolo in enumerate(model.yolo_layers):
+            metrics = {
+                "loss": yolo.metrics["loss"],
+                "cls_acc": yolo.metrics["cls_acc"],
+                "recall75": yolo.metrics["recall75"],
+                "precision": yolo.metrics["precision"],
+            }
+            row_metrics = [f"{metrics[metric]:.6f}" for metric in metrics]
+            metric_table += [[f"YOLO Layer {i}", *row_metrics]]
 
+            # Log total loss and average accuracy for each batch
+            total_loss = loss.item()
+            average_acc = sum(yolo.metrics["cls_acc"] for yolo in model.yolo_layers) / len(model.yolo_layers)
+            metric_table += [["Total loss", f"{total_loss:.6f}"]]
+            metric_table += [["Average Acc", f"{average_acc:.6f}"]]
+            #/new
+            
             log_str += AsciiTable(metric_table).table
+
+            
             log_str += f"\nTotal loss {loss.item()}"
 
             # Determine approximate time left for epoch
