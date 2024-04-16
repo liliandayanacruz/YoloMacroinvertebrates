@@ -23,14 +23,26 @@ def load_classes(path):
     names = fp.read().split("\n")
     return names
 
-
+    
 def weights_init_normal(m):
+    """
+    This line gets the class name of the module m being initialized. 
+    For example, if m is a convolutional layer, classname will contain 
+    the name of the class "Conv2d".
+    """
     classname = m.__class__.__name__
+    """
+    This line checks if the class name contains the string "Conv". 
+    If so, it means that m is a convolutional layer.
+    """
     if classname.find("Conv") != -1:
-        torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
+        torch.nn.init.normal_(m.weight.data, 0.0, 0.02) #initializes the weights of that layer using a normal distribution with a mean of 0 and a standard deviation of 0.02
+    
+    # If the class name does not contain the string "Conv" but contains the string "BatchNorm2d", 
+    # it means that m is a batch normalization layer.
     elif classname.find("BatchNorm2d") != -1:
-        torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
-        torch.nn.init.constant_(m.bias.data, 0.0)
+        torch.nn.init.normal_(m.weight.data, 1.0, 0.02) # For batch normalization layers, this line initializes the weights with a normal distribution with a mean of 1 and a standard deviation of 0.02. This is to initially incentivize the batch normalization layers to normalize the data to a mean close to 0 and a variance close to 1 during training.
+        torch.nn.init.constant_(m.bias.data, 0.0) # initializes the biases of the batch normalization layers to zero. This is commonly accepted as good practice in training neural networks to avoid any unwanted initial bias.
 
 
 def rescale_boxes(boxes, current_dim, original_shape):

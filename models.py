@@ -237,6 +237,10 @@ class YOLOLayer(nn.Module):
 class Darknet(nn.Module):
     """YOLOv3 object detection model"""
 
+    """
+    In this method, the configuration file is analyzed to define the architecture 
+    of the model and a list of modules is created for the neural network.
+    """
     def __init__(self, config_path, img_size=256):
         super(Darknet, self).__init__()
         self.module_defs = parse_model_config(config_path)
@@ -246,6 +250,13 @@ class Darknet(nn.Module):
         self.seen = 0
         self.header_info = np.array([0, 0, 0, self.seen, 0], dtype=np.int32)
 
+    """
+    This method defines the forward propagation of the model. 
+    It takes as input a tensor x that represents an image and optionally the training 
+    objectives (targets). This method loops through all the neural network modules 
+    defined in the __init__ method and computes the output of the model. 
+    If training objectives are provided, it also calculates the loss.
+    """
     def forward(self, x, targets=None):
         img_dim = x.shape[2]
         loss = 0
@@ -265,7 +276,13 @@ class Darknet(nn.Module):
             layer_outputs.append(x)
         yolo_outputs = to_cpu(torch.cat(yolo_outputs, 1))
         return yolo_outputs if targets is None else (loss, yolo_outputs)
-
+    
+    """
+    This method is used to load the pre-trained weights of the Darknet model. 
+    It takes as an argument the path to the pre-trained weights file (weights_path) 
+    and loads these weights into the neural network modules according to the 
+    architecture defined in the configuration file.
+    """
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""
 
@@ -319,6 +336,11 @@ class Darknet(nn.Module):
                 conv_layer.weight.data.copy_(conv_w)
                 ptr += num_w
 
+    """
+    This method is used to save the model weights to a file. 
+    It takes as arguments the path to the output file (path) and an optional 
+    cutoff point to specify how many layers of the model should be saved.
+    """
     def save_darknet_weights(self, path, cutoff=-1):
         """
             @:param path    - path of the new weights file
