@@ -25,10 +25,6 @@ import torch.optim as optim
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    """
-    This line creates an ArgumentParser object from the argparse standard library. 
-    This class is used to parse *command line arguments* in Python.
-    """
     parser.add_argument("--epochs", type=int, default=200, help="number of epochs")
     parser.add_argument("--batch_size", type=int, default=8, help="size of each image batch")
     parser.add_argument("--gradient_accumulations", type=int, default=2, help="number of gradient accums before step")
@@ -42,13 +38,9 @@ if __name__ == "__main__":
     parser.add_argument("--compute_map", default=False, help="if True computes mAP every tenth batch")
     parser.add_argument("--multiscale_training", default=True, help="allow for multi-scale training")
     opt = parser.parse_args()
-    """
-    This line prints the parsed arguments so the user can see what values have been 
-    passed to the script from the command line.
-    """
+    
     print ("User-entered parameters to train: ", opt)
     
-    #Pendiente solucionar
     logger = Logger("logs")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -58,16 +50,6 @@ if __name__ == "__main__":
     os.makedirs("output", exist_ok=True)
     os.makedirs("checkpoints", exist_ok=True)
     
-    """
-    Get data configuration throught "opt" object of Namespace type.
-    Adds other atributes to the object opt, in addition tho those entered by the user.
-    In this case, the paths to the configuration files.
-    The Namespace type is a data type provided by Python's argparse module. 
-    Represents a simple and useful namespace for storing command line arguments 
-    and their associated values. Namespace is simply a data structure that 
-    allows the values of command line arguments to be accessed in an 
-    organized and easy-to-use way in a Python script.
-    """
     data_config = parse_data_config(opt.data_config)
     train_path = data_config["train"]
     valid_path = data_config["valid"]
@@ -80,26 +62,13 @@ if __name__ == "__main__":
     # If specified we start from checkpoint - Load pretrained weights through command line
     if opt.pretrained_weights:
         # This line checks if the pre-trained weights file has a .pth extension
-        if opt.pretrained_weights.endswith(".pth"): # .pth files are designed specifically to work with PyTorch, meaning they are easy to load and manage using the functions and methods provided by PyTorch.
+        if opt.pretrained_weights.endswith(".pth"): # .pth files are designed specifically to work with PyTorch.
             model.load_state_dict(torch.load(opt.pretrained_weights)) #load the weights into the model using PyTorch's load_state_dict() method.
         else:
-            model.load_darknet_weights(opt.pretrained_weights) # If the pre-trained weights are not in .pth format, this suggests that they are in Darknet format. In this case, the load_darknet_weights() method defined in the Darknet class is used to load the weights into the model.
-    
-    # Aquí podríamos considerar usar otro archivo pth, más actualizado para el proyecto.
-
+            model.load_darknet_weights(opt.pretrained_weights) # If the pre-trained weights are not in .pth format, this suggests that they are in Darknet format.
     # Get dataloader - create a DataLoader in PyTorch to load the data from the training dataset
-    """
-    Here the ListDataset dataset is instantiated using the path to the training directory train_path. 
-    The argument augment=True indicates that data augmentation will be performed during training 
-    (e.g. rotations, cropping, etc.), and multiscale=opt.multiscale_training indicates whether 
-    training at multiple scales will be allowed. This creates a dataset object that contains the 
-    training data along with the specified transformations.
-    """
+    
     dataset = ListDataset(train_path, augment=True, multiscale=opt.multiscale_training)
-    """
-    Here the DataLoader is created using the dataset data set created earlier. 
-    Various arguments are specified such as batch_size, shuffle...
-    """
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=opt.batch_size, 
@@ -108,19 +77,7 @@ if __name__ == "__main__":
         pin_memory=True, # This is set to true to speed up data transfer to the GPU if it is being used, by preventing data from being copied to main memory.
         collate_fn=dataset.collate_fn, # This specifies a custom grouping function that is used to combine the data in batches. In this case, collate_fn defined in the dataset is used.
     )
-    """
-    Note: 
-    If we have a GPU available as an accelerator in model training, the num_workers=opt.n_cpu parameter 
-    in the DataLoader will control the number of threads used to load the data. Although the parameter 
-    refers to "CPU" (n_cpu), it is still relevant even if the GPU is used. The reason is that although 
-    the GPU is responsible for the calculation of parallel operations, the CPU is still responsible 
-    for other tasks, such as loading data and preparing batches. Additional threads (num_workers) 
-    help speed up data loading by allowing multiple data loading operations to be performed in parallel.
-    It is common to set num_workers to a value greater than zero to take advantage of CPU parallelism 
-    and speed up data loading. However, a very high number of threads can overload the CPU and have a 
-    negative impact on overall performance.
-    """
-    #optimizer = torch.optim.Adam(model.parameters())
+    
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01) # I changed it
     metrics = [
         "grid_size", # The size of the grid used to divide the input image.
@@ -139,100 +96,41 @@ if __name__ == "__main__":
         "conf_noobj", # The loss of trust for absent objects.
     ]
     
-    #Recall50 and Recall75: They are the recall rate (the proportion of positive examples 
-    #that were correctly identified) calculated from the confidence thresholds of 50% and 75% 
-    #respectively. For example, recall50 of 0.90 means that 90% of the positive examples were 
-    #correctly identified with a 50% confidence threshold.
-
-    #conf_obj and conf_noobj: They are object and non-object confidence measures respectively. 
-    #Conf_obj is the average confidence assigned to correctly detected objects, 
-    #while Conf_noobj is the average confidence assigned to places where no object was detected. 
-    #A high value in Conf_obj indicates that the model is confident in its object detections, 
-    #while a low value in Conf_noobj suggests that the model is not generating false positives 
-    #in areas where there are no objects.
-
-    #cls_acc: It is the classification accuracy, that is, the proportion of classes correctly 
-    #predicted in all detections. It is calculated as the percentage of correctly predicted 
-    #classes among all detections.
-
-    #Precision: It is a measure of the precision of object detections, that is, the proportion 
-    #of positive detections that are truly positive. It is calculated as the number of true 
-    #positives divided by the total number of detections (true positives plus false positives). 
-    #The precision is calculated for each class individually and then averaged.
-
     average_metrics = []
 
     for epoch in range(opt.epochs):
         model.train() # Sets the model in training mode
         start_time = time.time() # Mark the begig of train time
-        """
-        The loop iterates over batches of data provided by the DataLoader. 
-        Each batch consists of images (imgs) and their corresponding targets (targets), 
-        which contain the labels of the objects in those images.
-        """
+        #The loop iterates over batches of data provided by the DataLoader. 
+        #Each batch consists of images (imgs) and their corresponding targets (targets), 
         for batch_i, (_, imgs, targets) in enumerate(dataloader):
             
-            """
-            Batches_done: Represents the total number of batches processed from the start of training 
-            to the current batch at the current time. It is a way to keep track of training 
-            progress and provide feedback on how many batches have been processed in total 
-            in the current training.
-            """
+            
+            #Represents the total number of batches processed from the start of training 
+            #to the current batch at the current time. 
             batches_done = len(dataloader)* epoch + batch_i
-
-            #In this line, the input images (imgs) and targets are sent to the specified computing device (device)
-            """
-            In recent versions of PyTorch (1.0 and later), the use of Variable is no longer 
-            necessary as Tensors have the ability to track gradient by default. So here we've changed the code
-            """
-            #imgs = Variable(imgs.to(device))
-            #targets = Variable(targets.to(device), requires_grad=False) #requires_grad=False: It's not neccesary to calculate gradients of labels (targets)
-
-            #Send images to the device and enable gradient tracking
+            
+            #Send images and targets to the device and enable gradient tracking
             imgs = imgs.to(device).requires_grad_()
-            #Send targets to the device and disable gradient tracking
             targets = targets.to(device)
             
-            """
-            Here the forward propagation (forward pass) of the data through the model is performed. 
-            The input tensors (imgs and targets) are passed to the model, which then performs the 
-            necessary operations (such as convolutions, activations, etc.) to generate predictions 
-            (outputs) and calculate the loss. The loss represents the difference between the model 
-            predictions and the actual labels and is a measure of how well the model is performing 
-            on the training data.
-            """
+            #Forward propagation (forward pass)
             loss, outputs = model(imgs, targets)
-            """
-            After calculating the loss, this line performs gradient backpropagation (backward pass) 
-            through the computation graph that PyTorch has constructed during forward propagation. 
-            During backpropagation, PyTorch calculates loss gradients with respect to model parameters, 
-            allowing model weights to be adjusted to minimize loss in future training iterations. 
-            That is, this line calculates the gradients of the loss with respect to the model parameters,
-            allowing model optimization through gradient descent.
-            """
+            # Performs gradient backpropagation (backward pass)
             loss.backward()
 
-            """
-            This technique of accumulating gradients before updating weights can be useful in situations
-            where GPU memory is limited and an entire large batch cannot be processed at once. 
-            Accumulating gradients over multiple iterations can help mitigate this issue and enable 
-            effective training of resource-constrained models.
-            """
+            # Accumulating gradients before updating weights 
             if batches_done % opt.gradient_accumulations:
-                # Accumulates gradient before each step
                 optimizer.step()
                 optimizer.zero_grad()
 
             # ----------------
             #   Log progress
             # ----------------
-
-            #Training progress in each iteration of the training loop
+            
             log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, opt.epochs, batch_i, len(dataloader))
 
-            #This line creates a list that contains another nested list. 
-            #The outer list will contain all the rows of the metrics table, 
-            #and the inner list will represent the first row of table headers.
+            # A list that contains another nested list. 
             metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
 
             # Log metrics at each YOLO layer
@@ -243,35 +141,15 @@ if __name__ == "__main__":
                 row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.yolo_layers]
                 metric_table += [[metric, *row_metrics]]
 
-                # Tensorboard logging
-                #tensorboard_log = []
-                #for j, yolo in enumerate(model.yolo_layers):
-                #    for name, metric in yolo.metrics.items():
-                #        if name != "grid_size":
-                #            tensorboard_log += [(f"{name}_{j+1}", metric)]
-                #tensorboard_log += [("loss", loss.item())]
-                #logger.list_of_scalars_summary(tensorboard_log, batches_done)
-
                 for metric in metrics:
                     if metric == "grid_size":
-                        continue  # No incluir "grid_size" en los cálculos
+                        continue  # No "grid_size"
                     metric_values = []
                 for yolo in model.yolo_layers:
                     metric_value = yolo.metrics.get(metric, 0)
                     metric_values.append(metric_value)
                 metric_average = sum(metric_values) / len(metric_values)
                 average_metrics.append(metric_average)
-
-                csv_file = "average_metrics.csv"
-                with open(csv_file, "w", newline="") as csvfile:
-                    fieldnames = ["Metric", "Average Value"]
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for i, metric in enumerate(metrics):
-                        if metric == "grid_size":
-                            continue
-                        writer.writerow({"Metric": metric, "Average Value": average_metrics[i]})
-
 
             #log_str += AsciiTable(metric_table).table
             log_str += f"\nTotal loss {loss.item()}"
@@ -281,7 +159,7 @@ if __name__ == "__main__":
             time_left = datetime.timedelta(seconds=epoch_batches_left * (time.time() - start_time) / (batch_i + 1))
             log_str += f"\n---- ETA {time_left}"
 
-            #print(log_str)
+            print(log_str)
 
             model.seen += imgs.size(0)
 
@@ -314,6 +192,18 @@ if __name__ == "__main__":
 
         if epoch % opt.checkpoint_interval == 0:
             torch.save(model.state_dict(), f"yolov3_ckpt_%d.pth" % epoch)
+    
+    csv_file = "average_metrics.csv"
+    with open(csv_file, "w", newline="") as csvfile:
+        fieldnames = ["Epoch", "Batch", "Metric", "Average Value"]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for epoch in range(opt.epochs):
+            for batch_i in range(len(dataloader)):
+                for i, metric in enumerate(metrics):
+                    # Obtenemos el índice correspondiente al valor de la métrica para el batch actual
+                    index = (epoch * len(dataloader)) + batch_i
+                    writer.writerow({"Epoch": epoch, "Batch": batch_i, "Metric": metric, "Average Value": average_metrics[index]})
 
     end_time = time.time()
     training_duration = (end_time - start_time)/60

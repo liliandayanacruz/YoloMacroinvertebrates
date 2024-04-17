@@ -131,7 +131,7 @@ class YOLOLayer(nn.Module):
         # Calculate offsets for each grid
         self.grid_x = torch.arange(g).repeat(g, 1).view([1, 1, g, g]).type(FloatTensor)
         self.grid_y = torch.arange(g).repeat(g, 1).t().view([1, 1, g, g]).type(FloatTensor)
-        self.scaled_anchors = FloatTensor([(a_w / self.stride, a_h / self.stride) for a_w, a_h in self.anchors])
+        self.scaled_anchors = torch.tensor([(a_w / self.stride, a_h / self.stride) for a_w, a_h in self.anchors], dtype=torch.float, device='cuda')
         self.anchor_w = self.scaled_anchors[:, 0:1].view((1, self.num_anchors, 1, 1))
         self.anchor_h = self.scaled_anchors[:, 1:2].view((1, self.num_anchors, 1, 1))
 
@@ -192,20 +192,20 @@ class YOLOLayer(nn.Module):
             )
 
             # Loss : Mask outputs to ignore non-existing objects (except with conf. loss)
-            loss_x = self.mse_loss(x[obj_mask], tx[obj_mask])
-            loss_y = self.mse_loss(y[obj_mask], ty[obj_mask])
-            loss_w = self.mse_loss(w[obj_mask], tw[obj_mask])
-            loss_h = self.mse_loss(h[obj_mask], th[obj_mask])
-            loss_conf_obj = self.bce_loss(pred_conf[obj_mask], tconf[obj_mask])
-            loss_conf_noobj = self.bce_loss(pred_conf[noobj_mask], tconf[noobj_mask])
+            loss_x = self.mse_loss(x[obj_mask.bool()], tx[obj_mask.bool()])
+            loss_y = self.mse_loss(y[obj_mask.bool()], ty[obj_mask.bool()])
+            loss_w = self.mse_loss(w[obj_mask.bool()], tw[obj_mask.bool()])
+            loss_h = self.mse_loss(h[obj_mask.bool()], th[obj_mask.bool()])
+            loss_conf_obj = self.bce_loss(pred_conf[obj_mask.bool()], tconf[obj_mask.bool()])
+            loss_conf_noobj = self.bce_loss(pred_conf[noobj_mask.bool()], tconf[noobj_mask.bool()])
             loss_conf = self.obj_scale * loss_conf_obj + self.noobj_scale * loss_conf_noobj
-            loss_cls = self.bce_loss(pred_cls[obj_mask], tcls[obj_mask])
+            loss_cls = self.bce_loss(pred_cls[obj_mask.bool()], tcls[obj_mask.bool()])
             total_loss = loss_x + loss_y + loss_w + loss_h + loss_conf + loss_cls
 
             # Metrics
-            cls_acc = 100 * class_mask[obj_mask].mean()
-            conf_obj = pred_conf[obj_mask].mean()
-            conf_noobj = pred_conf[noobj_mask].mean()
+            cls_acc = 100 * class_mask[obj_mask.bool()].mean()
+            conf_obj = pred_conf[obj_mask.bool()].mean()
+            conf_noobj = pred_conf[noobj_mask.bool()].mean()
             conf50 = (pred_conf > 0.5).float()
             iou50 = (iou_scores > 0.5).float()
             iou75 = (iou_scores > 0.75).float()
@@ -237,10 +237,6 @@ class YOLOLayer(nn.Module):
 class Darknet(nn.Module):
     """YOLOv3 object detection model"""
 
-    """
-    In this method, the configuration file is analyzed to define the architecture 
-    of the model and a list of modules is created for the neural network.
-    """
     def __init__(self, config_path, img_size=256):
         super(Darknet, self).__init__()
         self.module_defs = parse_model_config(config_path)
@@ -250,13 +246,6 @@ class Darknet(nn.Module):
         self.seen = 0
         self.header_info = np.array([0, 0, 0, self.seen, 0], dtype=np.int32)
 
-    """
-    This method defines the forward propagation of the model. 
-    It takes as input a tensor x that represents an image and optionally the training 
-    objectives (targets). This method loops through all the neural network modules 
-    defined in the __init__ method and computes the output of the model. 
-    If training objectives are provided, it also calculates the loss.
-    """
     def forward(self, x, targets=None):
         img_dim = x.shape[2]
         loss = 0
@@ -276,13 +265,7 @@ class Darknet(nn.Module):
             layer_outputs.append(x)
         yolo_outputs = to_cpu(torch.cat(yolo_outputs, 1))
         return yolo_outputs if targets is None else (loss, yolo_outputs)
-    
-    """
-    This method is used to load the pre-trained weights of the Darknet model. 
-    It takes as an argument the path to the pre-trained weights file (weights_path) 
-    and loads these weights into the neural network modules according to the 
-    architecture defined in the configuration file.
-    """
+
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""
 
@@ -336,11 +319,6 @@ class Darknet(nn.Module):
                 conv_layer.weight.data.copy_(conv_w)
                 ptr += num_w
 
-    """
-    This method is used to save the model weights to a file. 
-    It takes as arguments the path to the output file (path) and an optional 
-    cutoff point to specify how many layers of the model should be saved.
-    """
     def save_darknet_weights(self, path, cutoff=-1):
         """
             @:param path    - path of the new weights file

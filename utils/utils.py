@@ -25,24 +25,16 @@ def load_classes(path):
 
     
 def weights_init_normal(m):
-    """
-    This line gets the class name of the module m being initialized. 
-    For example, if m is a convolutional layer, classname will contain 
-    the name of the class "Conv2d".
-    """
+   
     classname = m.__class__.__name__
-    """
-    This line checks if the class name contains the string "Conv". 
-    If so, it means that m is a convolutional layer.
-    """
+    
     if classname.find("Conv") != -1:
         torch.nn.init.normal_(m.weight.data, 0.0, 0.02) #initializes the weights of that layer using a normal distribution with a mean of 0 and a standard deviation of 0.02
     
     # If the class name does not contain the string "Conv" but contains the string "BatchNorm2d", 
-    # it means that m is a batch normalization layer.
     elif classname.find("BatchNorm2d") != -1:
-        torch.nn.init.normal_(m.weight.data, 1.0, 0.02) # For batch normalization layers, this line initializes the weights with a normal distribution with a mean of 1 and a standard deviation of 0.02. This is to initially incentivize the batch normalization layers to normalize the data to a mean close to 0 and a variance close to 1 during training.
-        torch.nn.init.constant_(m.bias.data, 0.0) # initializes the biases of the batch normalization layers to zero. This is commonly accepted as good practice in training neural networks to avoid any unwanted initial bias.
+        torch.nn.init.normal_(m.weight.data, 1.0, 0.02) 
+        torch.nn.init.constant_(m.bias.data, 0.0) 
 
 
 def rescale_boxes(boxes, current_dim, original_shape):
@@ -72,17 +64,6 @@ def xywh2xyxy(x):
 
 
 def ap_per_class(tp, conf, pred_cls, target_cls):
-    """ Compute the average precision, given the recall and precision curves.
-    Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
-    # Arguments
-        tp:    True positives (list).
-        conf:  Objectness value from 0-1 (list).
-        pred_cls: Predicted object classes (list).
-        target_cls: True object classes (list).
-    # Returns
-        The average precision as computed in py-faster-rcnn.
-    """
-
     # Sort by objectness
     i = np.argsort(-conf)
     tp, conf, pred_cls = tp[i], conf[i], pred_cls[i]
@@ -127,15 +108,6 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
 
 
 def compute_ap(recall, precision):
-    """ Compute the average precision, given the recall and precision curves.
-    Code originally from https://github.com/rbgirshick/py-faster-rcnn.
-
-    # Arguments
-        recall:    The recall curve (list).
-        precision: The precision curve (list).
-    # Returns
-        The average precision as computed in py-faster-rcnn.
-    """
     # correct AP calculation
     # first append sentinel values at the end
     mrec = np.concatenate(([0.0], recall, [1.0]))
@@ -236,13 +208,6 @@ def bbox_iou(box1, box2, x1y1x2y2=True):
 
 
 def non_max_suppression(prediction, conf_thres=0.5, nms_thres=0.4):
-    """
-    Removes detections with lower object confidence score than 'conf_thres' and performs
-    Non-Maximum Suppression to further filter detections.
-    Returns detections with shape:
-        (x1, y1, x2, y2, object_conf, class_score, class_pred)
-    """
-
     # From (center x, center y, width, height) to (x1, y1, x2, y2)
     prediction[..., :4] = xywh2xyxy(prediction[..., :4])
     output = [None for _ in range(len(prediction))]
