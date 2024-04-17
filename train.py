@@ -14,7 +14,6 @@ import sys
 import time
 import datetime
 import argparse
-import csv
 
 import torch
 from torch.utils.data import DataLoader
@@ -25,7 +24,7 @@ import torch.optim as optim
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=200, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--batch_size", type=int, default=8, help="size of each image batch")
     parser.add_argument("--gradient_accumulations", type=int, default=2, help="number of gradient accums before step")
     parser.add_argument("--model_def", type=str, default="config/yolov3.cfg", help="path to model definition file")
@@ -50,62 +49,58 @@ if __name__ == "__main__":
     os.makedirs("output", exist_ok=True)
     os.makedirs("checkpoints", exist_ok=True)
     
+    # Get data configuration
     data_config = parse_data_config(opt.data_config)
     train_path = data_config["train"]
     valid_path = data_config["valid"]
     class_names = load_classes(data_config["names"]) #Here, uses the function load_clases(path) in utils
 
     # Initiate model
-    model = Darknet(opt.model_def).to(device) # opt.model_def contains the path to the model definition file (.cfg format). Then move the model to device (GPU, CPU)
+    model = Darknet(opt.model_def).to(device) 
     model.apply(weights_init_normal)
 
     # If specified we start from checkpoint - Load pretrained weights through command line
     if opt.pretrained_weights:
         # This line checks if the pre-trained weights file has a .pth extension
         if opt.pretrained_weights.endswith(".pth"): # .pth files are designed specifically to work with PyTorch.
-            model.load_state_dict(torch.load(opt.pretrained_weights)) #load the weights into the model using PyTorch's load_state_dict() method.
+            model.load_state_dict(torch.load(opt.pretrained_weights)) #load the weights into the model.
         else:
-            model.load_darknet_weights(opt.pretrained_weights) # If the pre-trained weights are not in .pth format, this suggests that they are in Darknet format.
-    # Get dataloader - create a DataLoader in PyTorch to load the data from the training dataset
+            model.load_darknet_weights(opt.pretrained_weights) # If the pre-trained weights are not in .pth 
     
+    # Get dataloader - create a DataLoader in PyTorch to load the data from the training dataset
     dataset = ListDataset(train_path, augment=True, multiscale=opt.multiscale_training)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=opt.batch_size, 
-        shuffle=True, # This indicates that the data is shuffled before batching, which helps improve the generalization of the model.
-        num_workers=opt.n_cpu, # This specifies the number of threads to use to load the data efficiently. More threads can make data loading faster, but CPU usage will also increase.
-        pin_memory=True, # This is set to true to speed up data transfer to the GPU if it is being used, by preventing data from being copied to main memory.
-        collate_fn=dataset.collate_fn, # This specifies a custom grouping function that is used to combine the data in batches. In this case, collate_fn defined in the dataset is used.
+        shuffle=True, # The data is shuffled before batching, which helps improve the generalization of the model.
+        num_workers=opt.n_cpu, # This specifies the number of threads to use to load the data efficiently. 
+        pin_memory=True, # This is set to true to speed up data transfer to the GPU if it is being used
+        collate_fn=dataset.collate_fn, # Custom grouping function that is used to combine the data in batches. 
     )
     
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01) # I changed it
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001, weight_decay=0.01) # I changed it
     metrics = [
         "grid_size", # The size of the grid used to divide the input image.
         "loss", # This loss generally includes terms of coordinate loss, confidence loss, and classification loss.
         "x",
         "y",
         "w",
-        "h", # x, y, w, h: These metrics represent the coordinate loss for the coordinates x, y (position of the object on the grid) and w, h (width and height of the object).
+        "h", # x, y, w, h: Coordinates x, y (position of the object on the grid) and w, h (width and height).
         "conf", # Measures the accuracy of object detection in terms of the confidence assigned to the detections.
         "cls", # Measures the classification accuracy of detected object classes.
         "cls_acc", # Classification accuracy of detected object classes
-        "recall50", # The recall rate of object detections with a confidence threshold of 50% and 75%, respectively.
+        "recall50", # Detections with a confidence threshold of 50% and 75%, respectively.
         "recall75",
         "precision", # The accuracy of object detections
         "conf_obj", # The loss of trust for present objects.
         "conf_noobj", # The loss of trust for absent objects.
     ]
-    
-    average_metrics = []
-
+   
     for epoch in range(opt.epochs):
         model.train() # Sets the model in training mode
-        start_time = time.time() # Mark the begig of train time
-        #The loop iterates over batches of data provided by the DataLoader. 
-        #Each batch consists of images (imgs) and their corresponding targets (targets), 
+        start_time = time.time() # Mark the begig of train time. 
+        #The loop iterates over batches of data provided by the DataLoader. Each batch has images and targets
         for batch_i, (_, imgs, targets) in enumerate(dataloader):
-            
-            
             #Represents the total number of batches processed from the start of training 
             #to the current batch at the current time. 
             batches_done = len(dataloader)* epoch + batch_i
@@ -141,17 +136,16 @@ if __name__ == "__main__":
                 row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.yolo_layers]
                 metric_table += [[metric, *row_metrics]]
 
-                for metric in metrics:
-                    if metric == "grid_size":
-                        continue  # No "grid_size"
-                    metric_values = []
-                for yolo in model.yolo_layers:
-                    metric_value = yolo.metrics.get(metric, 0)
-                    metric_values.append(metric_value)
-                metric_average = sum(metric_values) / len(metric_values)
-                average_metrics.append(metric_average)
-
-            #log_str += AsciiTable(metric_table).table
+                # Tensorboard logging
+                tensorboard_log = []
+                for j, yolo in enumerate(model.yolo_layers):
+                    for name, metric in yolo.metrics.items():
+                        if name != "grid_size":
+                            tensorboard_log += [(f"{name}_{j+1}", metric)]
+                tensorboard_log += [("loss", loss.item())]
+                logger.list_of_scalars_summary(tensorboard_log, batches_done)
+                
+            log_str += AsciiTable(metric_table).table
             log_str += f"\nTotal loss {loss.item()}"
 
             # Determine approximate time left for epoch
@@ -191,19 +185,7 @@ if __name__ == "__main__":
             print(f"---- mAP {AP.mean()}")
 
         if epoch % opt.checkpoint_interval == 0:
-            torch.save(model.state_dict(), f"yolov3_ckpt_%d.pth" % epoch)
-    
-    csv_file = "average_metrics.csv"
-    with open(csv_file, "w", newline="") as csvfile:
-        fieldnames = ["Epoch", "Batch", "Metric", "Average Value"]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for epoch in range(opt.epochs):
-            for batch_i in range(len(dataloader)):
-                for i, metric in enumerate(metrics):
-                    # Obtenemos el índice correspondiente al valor de la métrica para el batch actual
-                    index = (epoch * len(dataloader)) + batch_i
-                    writer.writerow({"Epoch": epoch, "Batch": batch_i, "Metric": metric, "Average Value": average_metrics[index]})
+            torch.save(model.state_dict(), f"yolov3_ckpt_%d.pth" % epoch)  
 
     end_time = time.time()
     training_duration = (end_time - start_time)/60
